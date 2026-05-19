@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import PageHeader from '@/components/ui/PageHeader';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Pencil } from 'lucide-react';
 
 const DEFAULT_ROTINA = {
   'Segunda a Sexta': [
@@ -83,26 +89,47 @@ const saveRotina = (rotina) => {
 export default function Rotina() {
   const [activeTab, setActiveTab] = useState(TABS[0]);
   const [rotina, setRotina] = useState(loadRotina());
-  const [editingId, setEditingId] = useState(null);
-  const [editValue, setEditValue] = useState('');
   const [draggedItem, setDraggedItem] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingValues, setEditingValues] = useState({ atividade: '', tipo: '' });
+  const [addingNew, setAddingNew] = useState(false);
+  const [newActivity, setNewActivity] = useState({ atividade: '', tipo: 'refeicao', hora: '12:00 – 13:00' });
 
   useEffect(() => {
     saveRotina(rotina);
   }, [rotina]);
 
-  const handleEditStart = (atividade) => {
-    setEditingId(atividade);
-    setEditValue(atividade);
+  const handleEditStart = (index, item) => {
+    setEditingIndex(index);
+    setEditingValues({ atividade: item.atividade, tipo: item.tipo });
   };
 
-  const handleEditSave = (index) => {
-    if (editValue.trim()) {
+  const handleEditSave = () => {
+    if (editingValues.atividade.trim()) {
       const newRotina = { ...rotina };
-      newRotina[activeTab][index].atividade = editValue;
+      newRotina[activeTab][editingIndex] = {
+        ...newRotina[activeTab][editingIndex],
+        atividade: editingValues.atividade,
+        tipo: editingValues.tipo,
+      };
       setRotina(newRotina);
     }
-    setEditingId(null);
+    setEditingIndex(null);
+  };
+
+  const handleAddActivity = () => {
+    if (newActivity.atividade.trim()) {
+      const newRotina = { ...rotina };
+      newRotina[activeTab].push({
+        hora: newActivity.hora,
+        atividade: newActivity.atividade,
+        emoji: '⭐',
+        tipo: newActivity.tipo,
+      });
+      setRotina(newRotina);
+      setNewActivity({ atividade: '', tipo: 'refeicao', hora: '12:00 – 13:00' });
+      setAddingNew(false);
+    }
   };
 
   const handleDragStart = (e, index) => {
@@ -137,20 +164,30 @@ export default function Rotina() {
       <PageHeader title="Rotina Diária" subtitle="Sua organização pessoal" />
 
       {/* Tab selector */}
-      <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
-        {TABS.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-              activeTab === tab 
-                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' 
-                : 'bg-card text-muted-foreground border border-border hover:bg-muted'
-            }`}
-          >
-            {tab === 'Segunda a Sexta' ? '📅 Seg-Sex' : tab === 'Sábado' ? '📅 Sábado' : '📅 Domingo'}
-          </button>
-        ))}
+      <div className="flex gap-2 mb-8 overflow-x-auto pb-2 justify-between items-center">
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                activeTab === tab
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
+                  : 'bg-card text-muted-foreground border border-border hover:bg-muted'
+              }`}
+            >
+              {tab === 'Segunda a Sexta' ? '📅 Seg-Sex' : tab === 'Sábado' ? '📅 Sábado' : '📅 Domingo'}
+            </button>
+          ))}
+        </div>
+        <Button
+          onClick={() => setAddingNew(true)}
+          size="sm"
+          className="gap-2 whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4" />
+          Adicionar
+        </Button>
       </div>
 
       {/* Legend */}
@@ -202,30 +239,16 @@ export default function Rotina() {
             </div>
 
             {/* Content */}
-            <div className={`flex-1 rounded-xl p-4 border hover:shadow-md transition-shadow ${tipoCores[item.tipo]} mb-1`}>
-              <div className="flex items-center gap-2 group">
-                <span className="text-lg">{item.emoji}</span>
-                {editingId === i ? (
-                  <input
-                    autoFocus
-                    type="text"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={() => handleEditSave(i)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleEditSave(i);
-                      if (e.key === 'Escape') setEditingId(null);
-                    }}
-                    className="font-semibold text-sm flex-1 bg-transparent border-b-2 border-current focus:outline-none"
-                  />
-                ) : (
-                  <h3
-                    onClick={() => handleEditStart(item.atividade)}
-                    className="font-semibold text-sm flex-1 hover:opacity-70 transition-opacity"
-                  >
-                    {item.atividade}
-                  </h3>
-                )}
+            <div
+              onClick={() => handleEditStart(i, item)}
+              className={`flex-1 rounded-xl p-4 border hover:shadow-md hover:cursor-pointer transition-shadow group relative ${tipoCores[item.tipo]} mb-1`}
+            >
+              <div className="flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-lg">{item.emoji}</span>
+                  <h3 className="font-semibold text-sm">{item.atividade}</h3>
+                </div>
+                <Pencil className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
               </div>
               {item.detalhe && (
                 <p className="text-xs mt-1 opacity-75">{item.detalhe}</p>
@@ -234,6 +257,101 @@ export default function Rotina() {
           </motion.div>
         ))}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && setEditingIndex(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Atividade</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="atividade">Nome da Atividade</Label>
+              <Input
+                id="atividade"
+                value={editingValues.atividade}
+                onChange={(e) => setEditingValues({ ...editingValues, atividade: e.target.value })}
+                placeholder="Ex: Café da manhã"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tipo">Tipo</Label>
+              <Select value={editingValues.tipo} onValueChange={(value) => setEditingValues({ ...editingValues, tipo: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(tipoLabel).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setEditingIndex(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditSave}>
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Activity Dialog */}
+      <Dialog open={addingNew} onOpenChange={setAddingNew}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Nova Atividade</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="new-atividade">Nome da Atividade</Label>
+              <Input
+                id="new-atividade"
+                value={newActivity.atividade}
+                onChange={(e) => setNewActivity({ ...newActivity, atividade: e.target.value })}
+                placeholder="Ex: Café da manhã"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="new-hora">Horário</Label>
+              <Input
+                id="new-hora"
+                value={newActivity.hora}
+                onChange={(e) => setNewActivity({ ...newActivity, hora: e.target.value })}
+                placeholder="Ex: 08:30 – 09:30"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="new-tipo">Tipo</Label>
+              <Select value={newActivity.tipo} onValueChange={(value) => setNewActivity({ ...newActivity, tipo: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(tipoLabel).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setAddingNew(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAddActivity}>
+              Adicionar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
