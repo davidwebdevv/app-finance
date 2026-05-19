@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import StatCard from '@/components/ui/StatCard';
 import PageHeader from '@/components/ui/PageHeader';
 import ProgressRing from '@/components/ui/ProgressRing';
+import EditConfigDialog from '@/components/ui/EditConfigDialog';
 
 const formatCurrency = (v) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
@@ -66,7 +67,12 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle="Visão geral das suas finanças" />
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <PageHeader title="Dashboard" subtitle="Visão geral das suas finanças" />
+        </div>
+        <EditConfigDialog config={cfg} />
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard title="Receita Mensal" value={formatCurrency(cfg.receita_mensal)} icon={DollarSign} color="green" />
