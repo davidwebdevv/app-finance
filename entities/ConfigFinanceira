@@ -1,0 +1,52 @@
+{
+  "name": "ConfigFinanceira",
+  "type": "object",
+  "properties": {
+    "receita_mensal": {
+      "type": "number",
+      "default": 6000,
+      "description": "Receita mensal estimada"
+    },
+    "custos_operacionais": {
+      "type": "number",
+      "default": 2020,
+      "description": "Custos operacionais"
+    },
+    "contas_fixas": {
+      "type": "number",
+      "default": 1540,
+      "description": "Contas fixas mensais"
+    },
+    "alimentacao": {
+      "type": "number",
+      "default": 1000,
+      "description": "Gasto com alimenta\u00e7\u00e3o"
+    },
+    "livre": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor livre"
+    },
+    "dividas": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor destinado a d\u00edvidas"
+    },
+    "reserva": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor reserva"
+    },
+    "investimentos": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor para investimentos"
+    },
+    "lazer": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor para lazer"
+    }
+  },
+  "required": []
+}

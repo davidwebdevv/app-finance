@@ -1,0 +1,30 @@
+{
+  "name": "MiniIndice",
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da opera\u00e7\u00e3o"
+    },
+    "contratos": {
+      "type": "number",
+      "description": "Quantidade de contratos"
+    },
+    "pts": {
+      "type": "number",
+      "description": "Pontos"
+    },
+    "resultado": {
+      "type": "number",
+      "description": "Resultado financeiro"
+    },
+    "observacao": {
+      "type": "string",
+      "description": "Observa\u00e7\u00e3o da opera\u00e7\u00e3o"
+    }
+  },
+  "required": [
+    "data"
+  ]
+}

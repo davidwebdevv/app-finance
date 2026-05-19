@@ -1,0 +1,36 @@
+{
+  "name": "AcademiaDieta",
+  "type": "object",
+  "properties": {
+    "semana": {
+      "type": "number",
+      "description": "N\u00famero da semana (1-52)"
+    },
+    "ano": {
+      "type": "number",
+      "description": "Ano"
+    },
+    "peso": {
+      "type": "number",
+      "description": "Peso em kg"
+    },
+    "treinos": {
+      "type": "number",
+      "default": 0,
+      "description": "Quantidade de treinos na semana"
+    },
+    "kcal_media": {
+      "type": "number",
+      "default": 0,
+      "description": "Kcal m\u00e9dia di\u00e1ria"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es da semana"
+    }
+  },
+  "required": [
+    "semana",
+    "ano"
+  ]
+}

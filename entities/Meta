@@ -1,0 +1,38 @@
+{
+  "name": "Meta",
+  "type": "object",
+  "properties": {
+    "categoria": {
+      "type": "string",
+      "description": "Categoria da meta"
+    },
+    "meta": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o da meta"
+    },
+    "valor": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor alvo"
+    },
+    "valor_atual": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor atual alcan\u00e7ado"
+    },
+    "prazo": {
+      "type": "string",
+      "format": "date",
+      "description": "Prazo para conclus\u00e3o"
+    },
+    "concluido": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se a meta foi conclu\u00edda"
+    }
+  },
+  "required": [
+    "categoria",
+    "meta"
+  ]
+}

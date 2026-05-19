@@ -1,0 +1,33 @@
+{
+  "name": "FluxoDiario",
+  "type": "object",
+  "properties": {
+    "dia": {
+      "type": "number",
+      "description": "Dia do m\u00eas (1-31)"
+    },
+    "mes": {
+      "type": "string",
+      "description": "M\u00eas/Ano (ex: 2026-05)"
+    },
+    "receita": {
+      "type": "number",
+      "default": 0,
+      "description": "Receita do dia"
+    },
+    "gasolina": {
+      "type": "number",
+      "default": 0,
+      "description": "Gasto com gasolina"
+    },
+    "outros": {
+      "type": "number",
+      "default": 0,
+      "description": "Outros gastos"
+    }
+  },
+  "required": [
+    "dia",
+    "mes"
+  ]
+}

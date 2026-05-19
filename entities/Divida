@@ -1,0 +1,43 @@
+{
+  "name": "Divida",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da d\u00edvida"
+    },
+    "total": {
+      "type": "number",
+      "description": "Valor total da d\u00edvida"
+    },
+    "pago": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor j\u00e1 pago"
+    },
+    "prioridade": {
+      "type": "string",
+      "enum": [
+        "Alta",
+        "M\u00e9dia",
+        "Baixa"
+      ],
+      "default": "Alta",
+      "description": "N\u00edvel de prioridade"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Em aberto",
+        "Pagando",
+        "Quitada"
+      ],
+      "default": "Em aberto",
+      "description": "Status da d\u00edvida"
+    }
+  },
+  "required": [
+    "nome",
+    "total"
+  ]
+}

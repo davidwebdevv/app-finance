@@ -1,0 +1,37 @@
+{
+  "name": "Investimento",
+  "type": "object",
+  "properties": {
+    "mes": {
+      "type": "string",
+      "description": "M\u00eas (Jan, Fev, etc)"
+    },
+    "ano": {
+      "type": "number",
+      "description": "Ano"
+    },
+    "reserva": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor reserva"
+    },
+    "dividendos": {
+      "type": "number",
+      "default": 0,
+      "description": "Dividendos recebidos"
+    },
+    "acoes": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor em a\u00e7\u00f5es"
+    },
+    "objetivo": {
+      "type": "string",
+      "description": "Objetivo do m\u00eas"
+    }
+  },
+  "required": [
+    "mes",
+    "ano"
+  ]
+}
