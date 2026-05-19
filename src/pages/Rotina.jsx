@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import PageHeader from '@/components/ui/PageHeader';
 
-const ROTINA = {
+const DEFAULT_ROTINA = {
   'Segunda a Sexta': [
     { hora: '08:30 – 09:30', atividade: 'Café da manhã', emoji: '🍳🥛', detalhe: 'Ovos, aveia, banana, mel, pasta de amendoim e leite', tipo: 'refeicao' },
     { hora: '09:30 – 10:30', atividade: 'Estudo Programação/Faculdade', emoji: '💻', tipo: 'estudo' },
@@ -65,10 +65,72 @@ const tipoLabel = {
   descanso: 'Descanso',
 };
 
-const TABS = Object.keys(ROTINA);
+const TABS = Object.keys(DEFAULT_ROTINA);
+
+const loadRotina = () => {
+  try {
+    const stored = localStorage.getItem('rotina_data');
+    return stored ? JSON.parse(stored) : DEFAULT_ROTINA;
+  } catch {
+    return DEFAULT_ROTINA;
+  }
+};
+
+const saveRotina = (rotina) => {
+  localStorage.setItem('rotina_data', JSON.stringify(rotina));
+};
 
 export default function Rotina() {
   const [activeTab, setActiveTab] = useState(TABS[0]);
+  const [rotina, setRotina] = useState(loadRotina());
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [draggedItem, setDraggedItem] = useState(null);
+
+  useEffect(() => {
+    saveRotina(rotina);
+  }, [rotina]);
+
+  const handleEditStart = (atividade) => {
+    setEditingId(atividade);
+    setEditValue(atividade);
+  };
+
+  const handleEditSave = (index) => {
+    if (editValue.trim()) {
+      const newRotina = { ...rotina };
+      newRotina[activeTab][index].atividade = editValue;
+      setRotina(newRotina);
+    }
+    setEditingId(null);
+  };
+
+  const handleDragStart = (e, index) => {
+    setDraggedItem(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedItem === null || draggedItem === targetIndex) return;
+
+    const newRotina = { ...rotina };
+    const items = [...newRotina[activeTab]];
+    const [draggedItemContent] = items.splice(draggedItem, 1);
+    items.splice(targetIndex, 0, draggedItemContent);
+    newRotina[activeTab] = items;
+    setRotina(newRotina);
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+  };
 
   return (
     <div>
@@ -102,13 +164,18 @@ export default function Rotina() {
 
       {/* Timeline */}
       <div className="space-y-3">
-        {ROTINA[activeTab].map((item, i) => (
+        {rotina[activeTab].map((item, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.03 }}
-            className="flex gap-4 items-start"
+            draggable
+            onDragStart={(e) => handleDragStart(e, i)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, i)}
+            onDragEnd={handleDragEnd}
+            className={`flex gap-4 items-start cursor-move transition-opacity ${draggedItem === i ? 'opacity-50' : ''}`}
           >
             {/* Time column */}
             <div className="w-28 sm:w-36 flex-shrink-0 text-right">
@@ -129,16 +196,36 @@ export default function Rotina() {
                 item.tipo === 'tarefa' ? 'bg-amber-500 border-amber-300' :
                 'bg-slate-400 border-slate-300'
               }`} />
-              {i < ROTINA[activeTab].length - 1 && (
+              {i < rotina[activeTab].length - 1 && (
                 <div className="w-0.5 h-full min-h-[40px] bg-border" />
               )}
             </div>
 
             {/* Content */}
-            <div className={`flex-1 rounded-xl p-4 border ${tipoCores[item.tipo]} mb-1`}>
-              <div className="flex items-center gap-2">
+            <div className={`flex-1 rounded-xl p-4 border hover:shadow-md transition-shadow ${tipoCores[item.tipo]} mb-1`}>
+              <div className="flex items-center gap-2 group">
                 <span className="text-lg">{item.emoji}</span>
-                <h3 className="font-semibold text-sm">{item.atividade}</h3>
+                {editingId === i ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={() => handleEditSave(i)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleEditSave(i);
+                      if (e.key === 'Escape') setEditingId(null);
+                    }}
+                    className="font-semibold text-sm flex-1 bg-transparent border-b-2 border-current focus:outline-none"
+                  />
+                ) : (
+                  <h3
+                    onClick={() => handleEditStart(item.atividade)}
+                    className="font-semibold text-sm flex-1 hover:opacity-70 transition-opacity"
+                  >
+                    {item.atividade}
+                  </h3>
+                )}
               </div>
               {item.detalhe && (
                 <p className="text-xs mt-1 opacity-75">{item.detalhe}</p>
