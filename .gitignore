@@ -30,3 +30,4 @@ server/database.sqlite
 
 .env
 .vite
+.vercel
