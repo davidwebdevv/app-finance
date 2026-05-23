@@ -23,9 +23,15 @@ const DEFAULT_DATA = {
   Meta: [],
   MiniIndice: [],
   AcademiaDieta: [],
+  DietaRefeicoes: [],
+  PesoDiario: [],
 };
 
 const getStorageKey = (entityName) => `${STORAGE_PREFIX}${entityName}`;
+const getAuthToken = () => {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(`${STORAGE_PREFIX}auth_token`);
+};
 
 const readEntityData = (entityName) => {
   if (typeof window === 'undefined') {
@@ -79,6 +85,18 @@ const filterItems = (items, filters = {}) => {
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const saveAuthSession = (user, token) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(`${STORAGE_PREFIX}user`, JSON.stringify(user));
+  window.localStorage.setItem(`${STORAGE_PREFIX}auth_token`, token);
+};
+
+const clearAuthSession = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(`${STORAGE_PREFIX}user`);
+  window.localStorage.removeItem(`${STORAGE_PREFIX}auth_token`);
+};
+
 const buildUrl = (path, params = {}) => {
   const base = API_BASE_URL.replace(/\/$/, '');
   const url = new URL(`${base}/${path.replace(/^\//, '')}`);
@@ -91,9 +109,12 @@ const buildUrl = (path, params = {}) => {
 };
 
 const apiFetch = async (path, options = {}) => {
+  const authToken = getAuthToken();
   const response = await fetch(path, {
     headers: {
       'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...options.headers,
     },
     ...options,
   });
@@ -158,8 +179,34 @@ const createEntityService = (entityName) => ({
 });
 
 const auth = {
+  login: async (credentials) => {
+    if (!useBackend) {
+      throw new Error('Backend authentication is not configured. Set VITE_API_BASE_URL.');
+    }
+    const result = await apiFetch(buildUrl('/auth/login'), {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    saveAuthSession(result.user, result.token);
+    return result;
+  },
+  register: async (credentials) => {
+    if (!useBackend) {
+      throw new Error('Backend authentication is not configured. Set VITE_API_BASE_URL.');
+    }
+    const result = await apiFetch(buildUrl('/auth/register'), {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+    saveAuthSession(result.user, result.token);
+    return result;
+  },
   me: async () => {
     if (useBackend) {
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('Unauthorized');
+      }
       return apiFetch(buildUrl('/auth/me'));
     }
     if (typeof window === 'undefined') {
@@ -177,15 +224,15 @@ const auth = {
     if (useBackend) {
       await fetch(buildUrl('/auth/logout'), { method: 'POST' }).catch(() => null);
     }
+    clearAuthSession();
     if (typeof window === 'undefined') return;
-    window.localStorage.removeItem(`${STORAGE_PREFIX}user`);
     if (redirectUrl) {
       window.location.href = redirectUrl;
     }
   },
   redirectToLogin: (redirectUrl) => {
     if (typeof window === 'undefined') return;
-    window.location.href = redirectUrl || '/';
+    window.location.href = `/login?redirect=${encodeURIComponent(redirectUrl || '/')}`;
   },
 };
 
@@ -199,5 +246,7 @@ export const apiClient = {
     Meta: createEntityService('Meta'),
     MiniIndice: createEntityService('MiniIndice'),
     AcademiaDieta: createEntityService('AcademiaDieta'),
+    DietaRefeicoes: createEntityService('DietaRefeicoes'),
+    PesoDiario: createEntityService('PesoDiario'),
   },
 };

@@ -8,6 +8,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { motion } from 'framer-motion';
 import PageHeader from '@/components/ui/PageHeader';
+import { Combobox } from '@/components/ui/combobox';
 import { toast } from 'sonner';
 
 const formatCurrency = (v) => `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
@@ -54,12 +55,30 @@ export default function FluxoMensal() {
   });
 
   const formatDateLabel = (value) => {
+    // Se for string no formato YYYY-MM-DD, fazer split para evitar problema de timezone
+    if (typeof value === 'string' && value.includes('-')) {
+      const parts = value.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+      }
+    }
+    // Fallback para formato de data
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
   };
 
   const getMonthFromDate = (value) => {
+    // Se for string no formato YYYY-MM-DD, fazer split para evitar problema de timezone
+    if (typeof value === 'string' && value.includes('-')) {
+      const parts = value.split('-');
+      if (parts.length === 3) {
+        const [year, month] = parts;
+        return `${year}-${String(month).padStart(2, '0')}`;
+      }
+    }
+    // Fallback para cálculo de date
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return selectedMonth;
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -168,16 +187,12 @@ export default function FluxoMensal() {
           <Input type="date" placeholder="Data" value={newEntry.dia} onChange={e => setNewEntry({ ...newEntry, dia: e.target.value })} />
           <Input type="number" placeholder="Receita" value={newEntry.receita} onChange={e => setNewEntry({ ...newEntry, receita: e.target.value })} />
           <Input type="text" placeholder="Gasto (ex: -30 ou R$-30,00)" value={newEntry.gasto} onChange={e => setNewEntry({ ...newEntry, gasto: e.target.value })} />
-          <Select value={newEntry.categoria} onValueChange={(value) => setNewEntry({ ...newEntry, categoria: value })}>
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Categoria" />
-            </SelectTrigger>
-            <SelectContent>
-              {categorias.map((categoria) => (
-                <SelectItem key={categoria} value={categoria}>{categoria}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox 
+            options={categorias}
+            value={newEntry.categoria}
+            onValueChange={(value) => setNewEntry({ ...newEntry, categoria: value })}
+            placeholder="Categoria"
+          />
           <Button onClick={handleAdd} className="bg-primary hover:bg-primary/90">
             <Plus className="w-4 h-4 mr-2" /> Adicionar
           </Button>

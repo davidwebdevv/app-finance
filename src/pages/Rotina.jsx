@@ -4,9 +4,10 @@ import PageHeader from '@/components/ui/PageHeader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 
 const DEFAULT_ROTINA = {
   'Segunda a Sexta': [
@@ -91,17 +92,31 @@ export default function Rotina() {
   const [rotina, setRotina] = useState(loadRotina());
   const [draggedItem, setDraggedItem] = useState(null);
   const [editingIndex, setEditingIndex] = useState(null);
-  const [editingValues, setEditingValues] = useState({ atividade: '', tipo: '' });
+  const [editingValues, setEditingValues] = useState({ atividade: '', tipo: '', hora: '', detalhe: '', emoji: '' });
   const [addingNew, setAddingNew] = useState(false);
-  const [newActivity, setNewActivity] = useState({ atividade: '', tipo: 'refeicao', hora: '12:00 – 13:00' });
+  const [newActivity, setNewActivity] = useState({ atividade: '', tipo: 'refeicao', hora: '12:00 – 13:00', detalhe: '', emoji: '⭐' });
 
   useEffect(() => {
     saveRotina(rotina);
   }, [rotina]);
 
+  const parseStartTime = (hora) => {
+    if (!hora) return Number.MAX_SAFE_INTEGER;
+    const text = hora.split('–')[0]?.trim().replace('+', '').trim();
+    const [hours, minutes] = text.split(':').map((part) => Number(part));
+    if (Number.isNaN(hours)) return Number.MAX_SAFE_INTEGER;
+    return hours * 60 + (Number.isNaN(minutes) ? 0 : minutes);
+  };
+
   const handleEditStart = (index, item) => {
     setEditingIndex(index);
-    setEditingValues({ atividade: item.atividade, tipo: item.tipo });
+    setEditingValues({
+      atividade: item.atividade,
+      tipo: item.tipo,
+      hora: item.hora || '',
+      detalhe: item.detalhe || '',
+      emoji: item.emoji || '',
+    });
   };
 
   const handleEditSave = () => {
@@ -111,9 +126,21 @@ export default function Rotina() {
         ...newRotina[activeTab][editingIndex],
         atividade: editingValues.atividade,
         tipo: editingValues.tipo,
+        hora: editingValues.hora,
+        detalhe: editingValues.detalhe,
+        emoji: editingValues.emoji,
       };
+      newRotina[activeTab] = [...newRotina[activeTab]].sort((a, b) => parseStartTime(a.hora) - parseStartTime(b.hora));
       setRotina(newRotina);
     }
+    setEditingIndex(null);
+  };
+
+  const handleDeleteActivity = () => {
+    if (editingIndex === null) return;
+    const newRotina = { ...rotina };
+    newRotina[activeTab] = newRotina[activeTab].filter((_, index) => index !== editingIndex);
+    setRotina(newRotina);
     setEditingIndex(null);
   };
 
@@ -123,11 +150,13 @@ export default function Rotina() {
       newRotina[activeTab].push({
         hora: newActivity.hora,
         atividade: newActivity.atividade,
-        emoji: '⭐',
+        emoji: newActivity.emoji || '⭐',
         tipo: newActivity.tipo,
+        detalhe: newActivity.detalhe,
       });
+      newRotina[activeTab] = [...newRotina[activeTab]].sort((a, b) => parseStartTime(a.hora) - parseStartTime(b.hora));
       setRotina(newRotina);
-      setNewActivity({ atividade: '', tipo: 'refeicao', hora: '12:00 – 13:00' });
+      setNewActivity({ atividade: '', tipo: 'refeicao', hora: '12:00 – 13:00', detalhe: '', emoji: '⭐' });
       setAddingNew(false);
     }
   };
@@ -274,29 +303,78 @@ export default function Rotina() {
                 placeholder="Ex: Café da manhã"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="tipo">Tipo</Label>
-              <Select value={editingValues.tipo} onValueChange={(value) => setEditingValues({ ...editingValues, tipo: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(tipoLabel).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="tipo">Tipo</Label>
+                <Select value={editingValues.tipo} onValueChange={(value) => setEditingValues({ ...editingValues, tipo: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(tipoLabel).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="emoji">Emoji</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select value={editingValues.emoji} onValueChange={(value) => setEditingValues({ ...editingValues, emoji: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Escolha" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['🍳','💻','🍎','🚴','🍚','🏋️','🥤','📘','🍝','🌙','🐕','😴','🎨','📈','🧹','🚿','⭐'].map((emoji) => (
+                        <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="emoji"
+                    value={editingValues.emoji}
+                    onChange={(e) => setEditingValues({ ...editingValues, emoji: e.target.value })}
+                    placeholder="🤸"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="hora">Horário</Label>
+                <Input
+                  id="hora"
+                  value={editingValues.hora}
+                  onChange={(e) => setEditingValues({ ...editingValues, hora: e.target.value })}
+                  placeholder="Ex: 08:30 – 09:30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="detalhe">Descrição</Label>
+                <Textarea
+                  id="detalhe"
+                  value={editingValues.detalhe}
+                  onChange={(e) => setEditingValues({ ...editingValues, detalhe: e.target.value })}
+                  placeholder="Ex: ovos, banana, aveia, mel..."
+                />
+              </div>
             </div>
           </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setEditingIndex(null)}>
-              Cancelar
+          <div className="flex gap-2 justify-between items-center">
+            <Button variant="destructive" onClick={handleDeleteActivity}>
+              <Trash2 className="w-4 h-4" />
+              Excluir
             </Button>
-            <Button onClick={handleEditSave}>
-              Salvar
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditingIndex(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditSave}>
+                Salvar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -317,29 +395,63 @@ export default function Rotina() {
                 placeholder="Ex: Café da manhã"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="new-hora">Horário</Label>
-              <Input
-                id="new-hora"
-                value={newActivity.hora}
-                onChange={(e) => setNewActivity({ ...newActivity, hora: e.target.value })}
-                placeholder="Ex: 08:30 – 09:30"
-              />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="new-hora">Horário</Label>
+                <Input
+                  id="new-hora"
+                  value={newActivity.hora}
+                  onChange={(e) => setNewActivity({ ...newActivity, hora: e.target.value })}
+                  placeholder="Ex: 08:30 – 09:30"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-tipo">Tipo</Label>
+                <Select value={newActivity.tipo} onValueChange={(value) => setNewActivity({ ...newActivity, tipo: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(tipoLabel).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="new-tipo">Tipo</Label>
-              <Select value={newActivity.tipo} onValueChange={(value) => setNewActivity({ ...newActivity, tipo: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(tipoLabel).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="new-emoji">Emoji</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select value={newActivity.emoji} onValueChange={(value) => setNewActivity({ ...newActivity, emoji: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Escolha" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['🍳','💻','🍎','🚴','🍚','🏋️','🥤','📘','🍝','🌙','🐕','😴','🎨','📈','🧹','🚿','⭐'].map((emoji) => (
+                        <SelectItem key={emoji} value={emoji}>{emoji}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="new-emoji"
+                    value={newActivity.emoji}
+                    onChange={(e) => setNewActivity({ ...newActivity, emoji: e.target.value })}
+                    placeholder="🤸"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-detalhe">Descrição</Label>
+                <Textarea
+                  id="new-detalhe"
+                  value={newActivity.detalhe}
+                  onChange={(e) => setNewActivity({ ...newActivity, detalhe: e.target.value })}
+                  placeholder="Ex: ovos, banana, aveia, mel..."
+                />
+              </div>
             </div>
           </div>
           <div className="flex gap-2 justify-end">

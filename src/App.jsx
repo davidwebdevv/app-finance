@@ -8,6 +8,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import AppLayout from './components/layouts/AppLayout';
 import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
 import FluxoMensal from './pages/FluxoMensal';
 import Dividas from './pages/Dividas';
 import Investimentos from './pages/Investimentos';
@@ -63,7 +64,10 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <AuthenticatedApp />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/*" element={<AuthenticatedApp />} />
+          </Routes>
         </Router>
         <Toaster />
       </QueryClientProvider>

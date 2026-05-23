@@ -82,6 +82,8 @@ O frontend agora suporta um backend real via `VITE_API_BASE_URL`.
 
 ```env
 VITE_API_BASE_URL=http://localhost:4000
+JWT_SECRET=troque-para-uma-chave-secreta
+PORT=4000
 ```
 
 2. No `src/api/apiClient.js`, o cliente usa esse valor para chamar as rotas do backend.
@@ -110,6 +112,17 @@ VITE_API_BASE_URL=http://localhost:4000
 - `POST /entities/:entityName` → cria novo item
 - `PUT /entities/:entityName/:id` → atualiza item
 - `DELETE /entities/:entityName/:id` → remove item
+
+## Rodando o backend local
+
+Dentro da raiz do projeto:
+
+```bash
+npm install
+npm run dev:server
+```
+
+Isso inicia o backend em `http://localhost:4000`.
 
 ### Observações
 
