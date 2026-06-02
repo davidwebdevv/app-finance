@@ -1,252 +1,292 @@
-const STORAGE_PREFIX = 'app_financeiro_';
-const API_BASE_URL = typeof import.meta !== 'undefined' ? import.meta.env.VITE_API_BASE_URL : '';
-const useBackend = Boolean(API_BASE_URL && API_BASE_URL.length > 0);
+import { supabase } from '@/lib/supabase';
 
-const DEFAULT_DATA = {
-  ConfigFinanceira: [
-    {
-      id: 'config',
-      receita_mensal: 6000,
-      custos_operacionais: 2020,
-      contas_fixas: 1540,
-      alimentacao: 1000,
-      livre: 0,
-      dividas: 0,
-      reserva: 0,
-      investimentos: 0,
-      lazer: 0,
-    },
-  ],
-  Divida: [],
-  FluxoDiario: [],
-  Investimento: [],
-  Meta: [],
-  MiniIndice: [],
-  AcademiaDieta: [],
-  DietaRefeicoes: [],
-  PesoDiario: [],
+const STORAGE_PREFIX = 'app_financeiro:';
+const TABLE_ALIASES = {
+  ConfigFinanceira: ['config_financeira', 'configs_financeiras', 'user_settings'],
+  Divida: ['dividas', 'debts', 'divida'],
+  FluxoDiario: ['fluxo_diario', 'transactions', 'fluxo_mensal'],
+  Investimento: ['investimentos', 'investments', 'investimento'],
+  Meta: ['metas', 'goals', 'meta'],
+  MiniIndice: ['mini_indice', 'mini_indice_trades', 'mini_indice_operacoes'],
+  AcademiaDieta: ['academia_dieta', 'diet_plans', 'academia_dietas'],
 };
 
-const getStorageKey = (entityName) => `${STORAGE_PREFIX}${entityName}`;
-const getAuthToken = () => {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(`${STORAGE_PREFIX}auth_token`);
-};
+const tableCache = new Map();
 
-const readEntityData = (entityName) => {
-  if (typeof window === 'undefined') {
-    return DEFAULT_DATA[entityName] || [];
-  }
+const normalizeAlias = (value) =>
+  String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const getLocalUser = () => {
   try {
-    const stored = window.localStorage.getItem(getStorageKey(entityName));
-    if (!stored) {
-      window.localStorage.setItem(getStorageKey(entityName), JSON.stringify(DEFAULT_DATA[entityName] || []));
-      return DEFAULT_DATA[entityName] || [];
+    return JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}user`) || 'null');
+  } catch {
+    return null;
+  }
+};
+
+const getUserId = async () => {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user?.id) {
+      return user.id;
     }
-    return JSON.parse(stored) || [];
-  } catch (error) {
-    return DEFAULT_DATA[entityName] || [];
+  } catch {
+    // fallback para armazenamento local
+  }
+
+  const localUser = getLocalUser();
+
+  if (localUser?.id) {
+    return localUser.id;
+  }
+
+  throw new Error('Usuário não autenticado');
+};
+
+const resolveTableName = async (entityName) => {
+  if (tableCache.has(entityName)) {
+    return tableCache.get(entityName);
+  }
+
+  const candidates = Array.from(
+    new Set([
+      entityName,
+      normalizeAlias(entityName),
+      ...(TABLE_ALIASES[entityName] || []),
+    ])
+  );
+
+  for (const candidate of candidates) {
+    try {
+      const { error } = await supabase
+        .from(candidate)
+        .select('id', { head: true, count: 'exact' });
+
+      if (!error) {
+        tableCache.set(entityName, candidate);
+        return candidate;
+      }
+    } catch {
+      // tenta o próximo nome
+    }
+  }
+
+  tableCache.set(entityName, entityName);
+  return entityName;
+};
+
+const getStorageKey = (entityName, userId) => `${STORAGE_PREFIX}${entityName}_${userId || 'guest'}`;
+
+const readLocalItems = (entityName, userId) => {
+  try {
+    const raw = localStorage.getItem(getStorageKey(entityName, userId));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
   }
 };
 
-const writeEntityData = (entityName, data) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  window.localStorage.setItem(getStorageKey(entityName), JSON.stringify(data));
+const writeLocalItems = (entityName, userId, items) => {
+  localStorage.setItem(getStorageKey(entityName, userId), JSON.stringify(items));
 };
 
-const stableSort = (items, sortKey) => {
-  if (!sortKey) return items;
-  const direction = sortKey.startsWith('-') ? -1 : 1;
-  const key = sortKey.replace(/^-/, '');
-  return [...items].sort((a, b) => {
-    const va = a?.[key] ?? '';
-    const vb = b?.[key] ?? '';
-    if (va === vb) return 0;
-    if (va > vb) return direction;
-    return -direction;
-  });
-};
-
-const filterItems = (items, filters = {}) => {
-  return items.filter((item) => {
-    return Object.entries(filters).every(([key, value]) => {
+const localFallback = (entityName) => ({
+  list: async () => readLocalItems(entityName, await getUserId()),
+  filter: async (filters = {}, sortKey) => {
+    const items = readLocalItems(entityName, await getUserId());
+    const matched = items.filter((item) => Object.entries(filters).every(([key, value]) => {
       if (value === undefined || value === null || value === '') {
         return true;
       }
-      if (typeof item[key] === 'string') {
-        return item[key].toLowerCase().includes(String(value).toLowerCase());
-      }
-      return item[key] === value;
+      return String(item[key] ?? '').toLowerCase().includes(String(value).toLowerCase());
+    }));
+
+    if (!sortKey) {
+      return matched;
+    }
+
+    const direction = sortKey.startsWith('-') ? -1 : 1;
+    const key = sortKey.replace(/^-/, '');
+
+    return [...matched].sort((a, b) => {
+      const aValue = a[key] ?? '';
+      const bValue = b[key] ?? '';
+      if (aValue === bValue) return 0;
+      return (aValue > bValue ? 1 : -1) * direction;
     });
-  });
-};
-
-const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const saveAuthSession = (user, token) => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(`${STORAGE_PREFIX}user`, JSON.stringify(user));
-  window.localStorage.setItem(`${STORAGE_PREFIX}auth_token`, token);
-};
-
-const clearAuthSession = () => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(`${STORAGE_PREFIX}user`);
-  window.localStorage.removeItem(`${STORAGE_PREFIX}auth_token`);
-};
-
-const buildUrl = (path, params = {}) => {
-  const base = API_BASE_URL.replace(/\/$/, '');
-  const url = new URL(`${base}/${path.replace(/^\//, '')}`);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, String(value));
-    }
-  });
-  return url.toString();
-};
-
-const apiFetch = async (path, options = {}) => {
-  const authToken = getAuthToken();
-  const response = await fetch(path, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      ...options.headers,
-    },
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`API error ${response.status}: ${body}`);
-  }
-  return response.json();
-};
-
-const createEntityService = (entityName) => ({
-  list: async (sortKey) => {
-    if (useBackend) {
-      return apiFetch(buildUrl(`/entities/${entityName}`, { sort: sortKey }));
-    }
-    const items = readEntityData(entityName);
-    return stableSort(items, sortKey);
   },
-  filter: async (filters = {}, sortKey) => {
-    if (useBackend) {
-      return apiFetch(buildUrl(`/entities/${entityName}`, { ...filters, sort: sortKey }));
-    }
-    const items = filterItems(readEntityData(entityName), filters);
-    return stableSort(items, sortKey);
-  },
-  create: async (data) => {
-    if (useBackend) {
-      return apiFetch(buildUrl(`/entities/${entityName}`), {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-    }
-    const existing = readEntityData(entityName);
-    const item = { id: createId(), ...data };
-    const next = [...existing, item];
-    writeEntityData(entityName, next);
+  create: async (payload) => {
+    const userId = await getUserId();
+    const items = readLocalItems(entityName, userId);
+    const item = { id: crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...payload, user_id: userId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    writeLocalItems(entityName, userId, [...items, item]);
     return item;
   },
-  update: async (id, data) => {
-    if (useBackend) {
-      return apiFetch(buildUrl(`/entities/${entityName}/${id}`), {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      });
-    }
-    const existing = readEntityData(entityName);
-    const next = existing.map((item) => item.id === id ? { ...item, ...data } : item);
-    writeEntityData(entityName, next);
-    return next.find((item) => item.id === id) || null;
+  update: async (id, payload) => {
+    const userId = await getUserId();
+    const items = readLocalItems(entityName, userId);
+    const updated = items.map((item) => (item.id === id ? { ...item, ...payload, updatedAt: new Date().toISOString() } : item));
+    writeLocalItems(entityName, userId, updated);
+    return updated.find((item) => item.id === id) || null;
   },
   delete: async (id) => {
-    if (useBackend) {
-      return apiFetch(buildUrl(`/entities/${entityName}/${id}`), {
-        method: 'DELETE',
-      });
-    }
-    const existing = readEntityData(entityName);
-    const next = existing.filter((item) => item.id !== id);
-    writeEntityData(entityName, next);
-    return id;
+    const userId = await getUserId();
+    const items = readLocalItems(entityName, userId).filter((item) => item.id !== id);
+    writeLocalItems(entityName, userId, items);
+    return true;
   },
 });
 
-const auth = {
-  login: async (credentials) => {
-    if (!useBackend) {
-      throw new Error('Backend authentication is not configured. Set VITE_API_BASE_URL.');
-    }
-    const result = await apiFetch(buildUrl('/auth/login'), {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
-    saveAuthSession(result.user, result.token);
-    return result;
-  },
-  register: async (credentials) => {
-    if (!useBackend) {
-      throw new Error('Backend authentication is not configured. Set VITE_API_BASE_URL.');
-    }
-    const result = await apiFetch(buildUrl('/auth/register'), {
-      method: 'POST',
-      body: JSON.stringify(credentials),
-    });
-    saveAuthSession(result.user, result.token);
-    return result;
-  },
-  me: async () => {
-    if (useBackend) {
-      const token = getAuthToken();
-      if (!token) {
-        throw new Error('Unauthorized');
+const createEntityService = (entityName) => {
+  const fallback = localFallback(entityName);
+
+  return {
+    list: async () => {
+      try {
+        const userId = await getUserId();
+        const tableName = await resolveTableName(entityName);
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq('user_id', userId);
+
+        if (error) {
+          throw error;
+        }
+
+        return data || [];
+      } catch (error) {
+        console.warn(`Falha ao listar ${entityName}, usando fallback local.`, error);
+        return fallback.list();
       }
-      return apiFetch(buildUrl('/auth/me'));
-    }
-    if (typeof window === 'undefined') {
-      return { id: 'user', name: 'Usuário', role: 'user' };
-    }
-    const stored = window.localStorage.getItem(`${STORAGE_PREFIX}user`);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    const defaultUser = { id: 'user', name: 'Usuário', role: 'admin' };
-    window.localStorage.setItem(`${STORAGE_PREFIX}user`, JSON.stringify(defaultUser));
-    return defaultUser;
-  },
-  logout: async (redirectUrl) => {
-    if (useBackend) {
-      await fetch(buildUrl('/auth/logout'), { method: 'POST' }).catch(() => null);
-    }
-    clearAuthSession();
-    if (typeof window === 'undefined') return;
-    if (redirectUrl) {
-      window.location.href = redirectUrl;
-    }
-  },
-  redirectToLogin: (redirectUrl) => {
-    if (typeof window === 'undefined') return;
-    window.location.href = `/login?redirect=${encodeURIComponent(redirectUrl || '/')}`;
-  },
+    },
+
+    filter: async (filters = {}, sortKey) => {
+      try {
+        const userId = await getUserId();
+        const tableName = await resolveTableName(entityName);
+        let query = supabase
+          .from(tableName)
+          .select('*')
+          .eq('user_id', userId);
+
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            query = query.ilike(key, `%${String(value)}%`);
+          }
+        });
+
+        if (sortKey) {
+          const direction = sortKey.startsWith('-') ? false : true;
+          const key = sortKey.replace(/^-/, '');
+          query = query.order(key, { ascending: direction });
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          throw error;
+        }
+
+        return data || [];
+      } catch (error) {
+        console.warn(`Falha ao filtrar ${entityName}, usando fallback local.`, error);
+        return fallback.filter(filters, sortKey);
+      }
+    },
+
+    create: async (payload) => {
+      try {
+        const userId = await getUserId();
+        const tableName = await resolveTableName(entityName);
+        const { data, error } = await supabase
+          .from(tableName)
+          .insert([
+            {
+              ...payload,
+              user_id: userId,
+            },
+          ])
+          .select()
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        return data;
+      } catch (error) {
+        console.warn(`Falha ao criar ${entityName}, usando fallback local.`, error);
+        return fallback.create(payload);
+      }
+    },
+
+    update: async (id, payload) => {
+      try {
+        const userId = await getUserId();
+        const tableName = await resolveTableName(entityName);
+        const { data, error } = await supabase
+          .from(tableName)
+          .update(payload)
+          .eq('id', id)
+          .eq('user_id', userId)
+          .select()
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        return data;
+      } catch (error) {
+        console.warn(`Falha ao atualizar ${entityName}, usando fallback local.`, error);
+        return fallback.update(id, payload);
+      }
+    },
+
+    delete: async (id) => {
+      try {
+        const userId = await getUserId();
+        const tableName = await resolveTableName(entityName);
+        const { error } = await supabase
+          .from(tableName)
+          .delete()
+          .eq('id', id)
+          .eq('user_id', userId);
+
+        if (error) {
+          throw error;
+        }
+
+        return true;
+      } catch (error) {
+        console.warn(`Falha ao excluir ${entityName}, usando fallback local.`, error);
+        return fallback.delete(id);
+      }
+    },
+  };
 };
 
 export const apiClient = {
-  auth,
   entities: {
-    ConfigFinanceira: createEntityService('ConfigFinanceira'),
-    Divida: createEntityService('Divida'),
-    FluxoDiario: createEntityService('FluxoDiario'),
-    Investimento: createEntityService('Investimento'),
-    Meta: createEntityService('Meta'),
-    MiniIndice: createEntityService('MiniIndice'),
-    AcademiaDieta: createEntityService('AcademiaDieta'),
-    DietaRefeicoes: createEntityService('DietaRefeicoes'),
-    PesoDiario: createEntityService('PesoDiario'),
+    ConfigFinanceira: createEntityService('user_settings'),
+    Divida: createEntityService('debts'),
+    FluxoDiario: createEntityService('transactions'),
+    Investimento: createEntityService('investments'),
+    Meta: createEntityService('goals'),
+    MiniIndice: createEntityService('mini_indice_trades'),
+    AcademiaDieta: createEntityService('diet_plans'),
+
+    // Criar tabelas depois
+    // DietaRefeicoes: createEntityService('dieta_refeicoes'),
+    // PesoDiario: createEntityService('peso_diario'),
   },
 };

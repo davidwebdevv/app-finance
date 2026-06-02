@@ -1,7 +1,7 @@
 import React from 'react';
 import { apiClient } from '@/api/apiClient';
 import { useQuery } from '@tanstack/react-query';
-import { DollarSign, TrendingDown, Home, UtensilsCrossed, Wallet, CreditCard, PiggyBank, TrendingUp, Target } from 'lucide-react';
+import { DollarSign, TrendingDown, Home, UtensilsCrossed, Wallet, CreditCard, TrendingUp, Target } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { motion } from 'framer-motion';
 import StatCard from '@/components/ui/StatCard';

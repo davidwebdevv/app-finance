@@ -4,7 +4,8 @@ import {
   LayoutDashboard, ArrowLeftRight, CreditCard, TrendingUp, 
   Target, Dumbbell, BarChart3, Calendar, Menu, X, LogOut
 } from 'lucide-react';
-import { apiClient } from '@/api/apiClient';
+//import { apiClient } from '@/api/apiClient';
+import { useAuth } from '@/lib/AuthContext';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,6 +21,7 @@ const navItems = [
 export default function Sidebar() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { logout, user, displayName } = useAuth();
 
   const NavContent = () => (
     <>
@@ -31,6 +33,8 @@ export default function Sidebar() {
           <div>
             <h1 className="font-bold text-sidebar-foreground text-lg leading-tight">Máximo</h1>
             <p className="text-xs text-sidebar-foreground/50">Planejamento Financeiro</p>
+            <p className="text-[11px] text-sidebar-foreground/80 truncate font-medium">Olá, {displayName}</p>
+            {user?.email && <p className="text-[11px] text-sidebar-foreground/60 truncate">{user.email}</p>}
           </div>
         </div>
       </div>
@@ -58,7 +62,7 @@ export default function Sidebar() {
 
       <div className="p-3 border-t border-sidebar-border">
         <button 
-          onClick={() => apiClient.auth.logout()}
+          onClick={logout}
           className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all w-full"
         >
           <LogOut className="w-5 h-5" />

@@ -1,83 +1,194 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { apiClient } from '@/api/apiClient';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
+
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
-  const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(false);
-  const [authError, setAuthError] = useState(null);
-  const [authChecked, setAuthChecked] = useState(true);
-  const [appPublicSettings, setAppPublicSettings] = useState(null);
+const STORAGE_KEY = 'app_financeiro:user';
+const PROFILE_NAME_KEY = 'app_financeiro:profile_name';
+
+const getStoredProfileName = () => {
+  try {
+    return String(localStorage.getItem(PROFILE_NAME_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+const persistProfileName = (value) => {
+  try {
+    if (value) {
+      localStorage.setItem(PROFILE_NAME_KEY, String(value).trim());
+    } else {
+      localStorage.removeItem(PROFILE_NAME_KEY);
+    }
+  } catch {
+    // ignora falha local
+  }
+};
+
+const getDisplayName = (user) => {
+  if (!user) return getStoredProfileName() || 'Usuário';
+
+  const metadataName = user?.user_metadata?.name || user?.user_metadata?.full_name;
+  if (metadataName) return String(metadataName).trim();
+
+  if (getStoredProfileName()) return getStoredProfileName();
+
+  if (user?.email) return user.email.split('@')[0];
+
+  return 'Usuário';
+};
+
+const persistUser = (user) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user ?? null));
+  } catch {
+    // ignora falha local
+  }
+};
+
+export function AuthProvider({
+  children,
+}) {
+  const navigate = useNavigate();
+
+  const [user, setUser] =
+    useState(null);
+
+  const [
+    isAuthenticated,
+    setIsAuthenticated,
+  ] = useState(false);
+
+  const [
+    isLoadingAuth,
+    setIsLoadingAuth,
+  ] = useState(true);
+
+  const [authChecked, setAuthChecked] =
+    useState(false);
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const currentUser = await apiClient.auth.me();
-        setUser(currentUser);
+    async function loadUser() {
+      setIsLoadingAuth(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        persistUser(user);
+        setUser(user);
         setIsAuthenticated(true);
-      } catch (error) {
-        setUser(null);
-        setIsAuthenticated(false);
+      } else {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+          if (saved) {
+            setUser(saved);
+            setIsAuthenticated(true);
+          } else {
+            setUser(null);
+            setIsAuthenticated(false);
+          }
+        } catch {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
       }
-    };
+
+      setAuthChecked(true);
+      setIsLoadingAuth(false);
+    }
+
     loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        const currentUser = session?.user ?? null;
+
+        persistUser(currentUser);
+        setUser(currentUser);
+        setIsAuthenticated(!!currentUser);
+        setAuthChecked(true);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const checkUserAuth = async () => {
-    setIsLoadingAuth(true);
+  async function logout() {
     try {
-      const currentUser = await apiClient.auth.me();
-      setUser(currentUser);
-      setIsAuthenticated(true);
-      setAuthError(null);
+      await supabase.auth.signOut();
     } catch (error) {
+      console.warn('Falha ao encerrar sessão no Supabase:', error);
+    } finally {
+      persistUser(null);
+      persistProfileName('');
       setUser(null);
       setIsAuthenticated(false);
-      setAuthError({ type: 'auth_required', message: 'Authentication required' });
-    } finally {
-      setIsLoadingAuth(false);
+      setAuthChecked(true);
+      toast.success('Logout realizado com sucesso.');
+      navigate('/login', {
+        replace: true,
+      });
+    }
+  }
+
+  function navigateToLogin() {
+    navigate('/login', {
+      replace: true,
+    });
+  }
+
+  async function checkUserAuth() {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      persistUser(user ?? null);
+      setUser(user ?? null);
+      setIsAuthenticated(!!user);
+      setAuthChecked(true);
+    } catch (error) {
+      console.warn('Falha ao validar sessão:', error);
+      setUser(null);
+      setIsAuthenticated(false);
       setAuthChecked(true);
     }
-  };
-
-  const logout = (shouldRedirect = true) => {
-    setUser(null);
-    setIsAuthenticated(false);
-    apiClient.auth.logout(shouldRedirect ? window.location.href : undefined);
-  };
-
-  const navigateToLogin = () => {
-    apiClient.auth.redirectToLogin(window.location.href);
-  };
+  }
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated, 
-      isLoadingAuth,
-      isLoadingPublicSettings,
-      authError,
-      appPublicSettings,
-      authChecked,
-      logout,
-      navigateToLogin,
-      checkUserAuth,
-      checkAppState: checkUserAuth,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        displayName: getDisplayName(user),
+        isAuthenticated,
+        isLoadingAuth,
+        authChecked,
+        logout,
+        navigateToLogin,
+        checkUserAuth,
+        checkAppState: checkUserAuth,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-
+export function useAuth() {
+  return useContext(AuthContext);
+}
