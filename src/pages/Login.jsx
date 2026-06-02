@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { requireSupabase } from '@/lib/supabase';
 
 export default function Login() {
   const { isAuthenticated, displayName } = useAuth();
@@ -58,6 +58,8 @@ export default function Login() {
     setIsLoading(true);
 
     try {
+      const supabase = requireSupabase();
+
       if (mode === 'register') {
         const { error } =
           await supabase.auth.signUp({

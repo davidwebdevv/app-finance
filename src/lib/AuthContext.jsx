@@ -7,7 +7,7 @@ import React, {
 
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
+import { requireSupabase } from '@/lib/supabase';
 
 const AuthContext = createContext();
 
@@ -77,31 +77,41 @@ export function AuthProvider({
     useState(false);
 
   useEffect(() => {
+    let subscription = null;
+
     async function loadUser() {
       setIsLoadingAuth(true);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const supabase = requireSupabase();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (user) {
-        persistUser(user);
-        setUser(user);
-        setIsAuthenticated(true);
-      } else {
-        try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-          if (saved) {
-            setUser(saved);
-            setIsAuthenticated(true);
-          } else {
-            setUser(null);
-            setIsAuthenticated(false);
-          }
-        } catch {
+        if (user) {
+          persistUser(user);
+          setUser(user);
+          setIsAuthenticated(true);
+          setAuthChecked(true);
+          setIsLoadingAuth(false);
+          return;
+        }
+      } catch (error) {
+        console.warn('Supabase não configurado ou indisponível:', error);
+      }
+
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        if (saved) {
+          setUser(saved);
+          setIsAuthenticated(true);
+        } else {
           setUser(null);
           setIsAuthenticated(false);
         }
+      } catch {
+        setUser(null);
+        setIsAuthenticated(false);
       }
 
       setAuthChecked(true);
@@ -110,26 +120,30 @@ export function AuthProvider({
 
     loadUser();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+    try {
+      const supabase = requireSupabase();
+      const response = supabase.auth.onAuthStateChange((_event, session) => {
         const currentUser = session?.user ?? null;
 
         persistUser(currentUser);
         setUser(currentUser);
         setIsAuthenticated(!!currentUser);
         setAuthChecked(true);
-      }
-    );
+      });
+
+      subscription = response.data.subscription;
+    } catch (error) {
+      console.warn('Não foi possível configurar o listener do Supabase:', error);
+    }
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe?.();
     };
   }, []);
 
   async function logout() {
     try {
+      const supabase = requireSupabase();
       await supabase.auth.signOut();
     } catch (error) {
       console.warn('Falha ao encerrar sessão no Supabase:', error);
@@ -154,6 +168,7 @@ export function AuthProvider({
 
   async function checkUserAuth() {
     try {
+      const supabase = requireSupabase();
       const {
         data: { user },
       } = await supabase.auth.getUser();

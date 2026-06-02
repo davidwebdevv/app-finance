@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { requireSupabase } from '@/lib/supabase';
 
 const STORAGE_PREFIX = 'app_financeiro:';
 const TABLE_ALIASES = {
@@ -31,7 +31,8 @@ const getLocalUser = () => {
 
 const getUserId = async () => {
   try {
-    const {
+const supabase = requireSupabase();
+  const {
       data: { user },
     } = await supabase.auth.getUser();
 
@@ -66,6 +67,7 @@ const resolveTableName = async (entityName) => {
 
   for (const candidate of candidates) {
     try {
+      const supabase = requireSupabase();
       const { error } = await supabase
         .from(candidate)
         .select('id', { head: true, count: 'exact' });
@@ -151,6 +153,7 @@ const createEntityService = (entityName) => {
   return {
     list: async () => {
       try {
+        const supabase = requireSupabase();
         const userId = await getUserId();
         const tableName = await resolveTableName(entityName);
         const { data, error } = await supabase
@@ -171,6 +174,7 @@ const createEntityService = (entityName) => {
 
     filter: async (filters = {}, sortKey) => {
       try {
+        const supabase = requireSupabase();
         const userId = await getUserId();
         const tableName = await resolveTableName(entityName);
         let query = supabase
@@ -205,6 +209,7 @@ const createEntityService = (entityName) => {
 
     create: async (payload) => {
       try {
+        const supabase = requireSupabase();
         const userId = await getUserId();
         const tableName = await resolveTableName(entityName);
         const { data, error } = await supabase
@@ -231,6 +236,7 @@ const createEntityService = (entityName) => {
 
     update: async (id, payload) => {
       try {
+        const supabase = requireSupabase();
         const userId = await getUserId();
         const tableName = await resolveTableName(entityName);
         const { data, error } = await supabase
@@ -254,6 +260,7 @@ const createEntityService = (entityName) => {
 
     delete: async (id) => {
       try {
+        const supabase = requireSupabase();
         const userId = await getUserId();
         const tableName = await resolveTableName(entityName);
         const { error } = await supabase
