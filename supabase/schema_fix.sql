@@ -28,8 +28,13 @@ CREATE TABLE IF NOT EXISTS public.debts (
 CREATE TABLE IF NOT EXISTS public.diet_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  nome TEXT,
-  descricao TEXT,
+  semana INTEGER DEFAULT 1,
+  ano INTEGER DEFAULT EXTRACT(YEAR FROM now()),
+  peso NUMERIC DEFAULT 0,
+  treinos INTEGER DEFAULT 0,
+  kcal_media NUMERIC DEFAULT 0,
+  observacoes TEXT,
+  plano_dieta TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -58,8 +63,13 @@ ALTER TABLE public.debts ADD COLUMN IF NOT EXISTS pago NUMERIC DEFAULT 0;
 ALTER TABLE public.debts ADD COLUMN IF NOT EXISTS prioridade TEXT DEFAULT 'Alta';
 ALTER TABLE public.debts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Em aberto';
 
-ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS nome TEXT;
-ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS descricao TEXT;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS semana INTEGER DEFAULT 1;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS ano INTEGER DEFAULT EXTRACT(YEAR FROM now());
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS peso NUMERIC DEFAULT 0;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS treinos INTEGER DEFAULT 0;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS kcal_media NUMERIC DEFAULT 0;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS observacoes TEXT;
+ALTER TABLE public.diet_plans ADD COLUMN IF NOT EXISTS plano_dieta TEXT;
 
 ALTER TABLE public.mini_indice_trades ADD COLUMN IF NOT EXISTS data TEXT;
 ALTER TABLE public.mini_indice_trades ADD COLUMN IF NOT EXISTS contratos NUMERIC DEFAULT 0;

@@ -91,13 +91,11 @@ const sanitizePayloadForSchemaError = (entityName, payload, error) => {
   const message = String(error?.message || '');
   const sanitized = { ...payload };
 
-  if (/pago/i.test(message)) {
-    delete sanitized.pago;
-  }
+  const missingColumns = [...message.matchAll(/'([^']+)' column/i)].map((match) => match[1]);
 
-  if (/contratos/i.test(message)) {
-    delete sanitized.contratos;
-  }
+  missingColumns.forEach((column) => {
+    delete sanitized[column];
+  });
 
   if (entityName === 'debts' && /pago/i.test(message)) {
     delete sanitized.pago;
