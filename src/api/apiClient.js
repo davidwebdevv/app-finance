@@ -87,6 +87,48 @@ const resolveTableName = async (entityName) => {
 
 const getStorageKey = (entityName, userId) => `${STORAGE_PREFIX}${entityName}_${userId || 'guest'}`;
 
+const sanitizePayloadForSchemaError = (entityName, payload, error) => {
+  const message = String(error?.message || '');
+  const sanitized = { ...payload };
+
+  if (/pago/i.test(message)) {
+    delete sanitized.pago;
+  }
+
+  if (/contratos/i.test(message)) {
+    delete sanitized.contratos;
+  }
+
+  if (entityName === 'debts' && /pago/i.test(message)) {
+    delete sanitized.pago;
+  }
+
+  if (entityName === 'mini_indice_trades' && /contratos/i.test(message)) {
+    delete sanitized.contratos;
+  }
+
+  return sanitized;
+};
+
+const executeWithSchemaFallback = async ({ entityName, operation, buildRequest }) => {
+  const result = await operation(buildRequest(payload => payload));
+
+  if (!result.error) {
+    return result;
+  }
+
+  const sanitizedPayload = sanitizePayloadForSchemaError(entityName, buildRequest.payload ?? {}, result.error);
+
+  if (JSON.stringify(sanitizedPayload) !== JSON.stringify(buildRequest.payload ?? {})) {
+    const retryResult = await operation(buildRequest(() => sanitizedPayload));
+    if (!retryResult.error) {
+      return retryResult;
+    }
+  }
+
+  return result;
+};
+
 const readLocalItems = (entityName, userId) => {
   try {
     const raw = localStorage.getItem(getStorageKey(entityName, userId));
@@ -212,18 +254,33 @@ const createEntityService = (entityName) => {
         const supabase = requireSupabase();
         const userId = await getUserId();
         const tableName = await resolveTableName(entityName);
-        const { data, error } = await supabase
-          .from(tableName)
-          .insert([
-            {
-              ...payload,
-              user_id: userId,
-            },
-          ])
-          .select()
-          .single();
+
+        const buildRequest = (resolver) => ({
+          payload: resolver(payload),
+          execute: () => supabase
+            .from(tableName)
+            .insert([
+              {
+                ...resolver(payload),
+                user_id: userId,
+              },
+            ])
+            .select()
+            .single(),
+        });
+
+        const request = buildRequest((value) => value);
+        const { data, error } = await request.execute();
 
         if (error) {
+          const sanitizedPayload = sanitizePayloadForSchemaError(entityName, request.payload, error);
+          if (JSON.stringify(sanitizedPayload) !== JSON.stringify(request.payload)) {
+            const retry = buildRequest(() => sanitizedPayload);
+            const retryResult = await retry.execute();
+            if (!retryResult.error) {
+              return retryResult.data;
+            }
+          }
           throw error;
         }
 
@@ -239,15 +296,30 @@ const createEntityService = (entityName) => {
         const supabase = requireSupabase();
         const userId = await getUserId();
         const tableName = await resolveTableName(entityName);
-        const { data, error } = await supabase
-          .from(tableName)
-          .update(payload)
-          .eq('id', id)
-          .eq('user_id', userId)
-          .select()
-          .single();
+
+        const buildRequest = (resolver) => ({
+          payload: resolver(payload),
+          execute: () => supabase
+            .from(tableName)
+            .update(resolver(payload))
+            .eq('id', id)
+            .eq('user_id', userId)
+            .select()
+            .single(),
+        });
+
+        const request = buildRequest((value) => value);
+        const { data, error } = await request.execute();
 
         if (error) {
+          const sanitizedPayload = sanitizePayloadForSchemaError(entityName, request.payload, error);
+          if (JSON.stringify(sanitizedPayload) !== JSON.stringify(request.payload)) {
+            const retry = buildRequest(() => sanitizedPayload);
+            const retryResult = await retry.execute();
+            if (!retryResult.error) {
+              return retryResult.data;
+            }
+          }
           throw error;
         }
 
